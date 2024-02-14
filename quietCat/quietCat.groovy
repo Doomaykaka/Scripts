@@ -526,38 +526,10 @@ def createTemplateCLI(Path pathToTemplatesFolder){
 }
 
 def uploadTemplates(String pathToTemplatesFolder) {
-    println("-----------")
-    println(pathToTemplatesFolder)
-    println("-----------")
-    println([
-        [
-            "cd",
-            pathToTemplatesFolder,
-        ].join(" "),
-        [
-            "git",
-            "add",
-            ".",
-        ].join(" "),
-        [
-            "git",
-            "commit",
-            "-m",
-            "\"Update\"",
-        ].join(" "),
-        [
-            "git",
-            "push",
-        ].join(" "),
-    ].join(" ")
-    )
-
-    //Path to templates folder absolute needed
-
     executeCommands(
         [
             "cd",
-            pathToTemplatesFolder,
+            """\"${pathToTemplatesFolder}\"""",
         ].join(" "),
         [
             "git",
@@ -598,8 +570,6 @@ Integer chooseTemplateCLI(Map templatesList){
     }
 
     templateId = createCLIQuestion(questionText = "Choose", isAppQuestion = true) as Integer
-
-    print(templateId)
 
     if(!templatesList.containsKey(templateId)){
         printAppOutput(text="Bad answer", is_title=false, level=0, prefix="!", postfix="", needNewLine=true)
@@ -650,9 +620,7 @@ def String createCLIQuestion(String questionText, Boolean isAppQuestion){
 def executeCommands(String[] commands){
     unionCommand = ""
 
-    for(command : commands){
-        unionCommand += command + ";"
-    }
+    unionCommand = commands.join(";")
 
     executeCommand(unionCommand)
 }
