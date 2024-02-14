@@ -166,6 +166,7 @@ class Template {
         for(templateFoldersGroup : templateFoldersData) {
             for (templateFolder : templateFoldersGroup) {
                 TemplateFolder newTemplateFolder = new TemplateFolder(Paths.get("."), "default")
+
                 newTemplateFolder.load(templateFolder)
 
                 this.templateFolders.add(newTemplateFolder)
@@ -196,6 +197,14 @@ class TemplateFolder{
         templateFiles = []
         this.nameWithInsertation = nameWithInsertation
         currentPath = Paths.get(parentDir.toString(), nameWithInsertation)
+
+        // #2
+        // println("===============")
+        // println(parentDir)
+        // println(parentDir.toString())
+        // println(nameWithInsertation)
+        // println(Paths.get(parentDir.toString(), nameWithInsertation).toString())
+        // println("===============")
     }
 
     void parse(){
@@ -218,14 +227,26 @@ class TemplateFolder{
 
     void generate(Insertations insertations) {
         File folder
+        Path pathToFile
 
         if(insertations.size() != 0){
-            folder = new File(Paths.get(currentPath.parent.toString(), insertations.replace(nameWithInsertation.toString())).toString())
+            pathToFile = Paths.get(currentPath.parent.toString(), insertations.replace(nameWithInsertation.toString()))
         } else {
-            folder = new File(Paths.get(currentPath.parent.toString(), nameWithInsertation.toString()).toString())
+            pathToFile = Paths.get(currentPath.parent.toString(), nameWithInsertation.toString())
         }
 
-        folder.mkdir()
+        // #1
+        // println("===============")
+        // println(currentPath)
+        // println(currentPath.parent)
+        // println(currentPath.parent.ToString())
+        // println(nameWithInsertation)
+        // println(nameWithInsertation.toString())
+        // println("===============")
+
+        folder = new File(pathToFile.toString())
+
+        folder.mkdirs()
     }
 
     List save() {
@@ -257,9 +278,16 @@ class TemplateFolder{
     }
 
     def load(def templateFolderData) {
+        // #3 возможно тут проблема
+        println("===============")
+        println(templateFolderData.templateFolder) //сама папка, содержит current path
+        println(templateFolderData.templateFolder.templateFolders) //папки этой папки)
+        println(templateFolderData.templateFolder.templateFiles) //файлы этой папки)
+        println("===============")
+
         if (templateFolderData != null) {
-            def templateFoldersData = templateFolderData.templateFolders
-            def templateFilesData = templateFolderData.templateFiles
+            def templateFoldersData = templateFolderData.templateFolder.templateFolders
+            def templateFilesData = templateFolderData.templateFolder.templateFiles
 
 
             for(templateFoldersGroup : templateFoldersData) {
@@ -282,12 +310,17 @@ class TemplateFolder{
                 }
             }
 
-            def nameWithInsertationData = templateFolderData.nameWithInsertation
+            def nameWithInsertationData = templateFolderData.templateFolder.nameWithInsertation
 
-            def currentPathData = templateFolderData.currentPath
+            def currentPathData = templateFolderData.templateFolder.currentPath
 
             this.nameWithInsertation = nameWithInsertationData
             this.currentPath = Paths.get(currentPathData.toString())
+
+            println("===============")
+            println(currentPathData.toString())
+            println(nameWithInsertationData)
+            println("===============")
         }
     }
 
@@ -308,11 +341,13 @@ class TemplateFile {
     void parse(Insertations insertions) {
         File currentFile = new File(currentPath.toString())
 
-        Scanner scn = new Scanner(currentFile)
-        while (scn.hasNextLine()) {
-            content.add(scn.nextLine())
+        if (currentFile.exist()) {
+            Scanner scn = new Scanner(currentFile)
+            while (scn.hasNextLine()) {
+                content.add(scn.nextLine())
+            }
+            scn.close()
         }
-        scn.close()
     }
 
     void generate(Insertations insertations) {
