@@ -163,17 +163,18 @@ class Template {
         def templateFoldersData = dataSet.templateFolders
         def templateFilesData = dataSet.templateFiles
 
-        for (templateFolder : templateFoldersData) {
-            TemplateFolder newTemplateFolder = new TemplateFolder(Paths.get("."), "default")
-            newTemplateFolder.load(templateFolder)
+        for(templateFoldersGroup : templateFoldersData) {
+            for (templateFolder : templateFoldersGroup) {
+                TemplateFolder newTemplateFolder = new TemplateFolder(Paths.get("."), "default")
+                newTemplateFolder.load(templateFolder)
 
-            this.templateFolders.add(newTemplateFolder)
+                this.templateFolders.add(newTemplateFolder)
+            }
         }
 
-        for(templateFileGroup : templateFilesData){
-            for (templateFile : templateFileGroup) {
+        for(templateFileGroup : templateFilesData) {
+            for (templateFile : templateFileGroup.templateFile) {
                 TemplateFile newTemplateFile = new TemplateFile(Paths.get("."), "default")
-                templateFile = templateFile.templateFile
                 newTemplateFile.load(templateFile)
 
                 this.templateFiles.add(newTemplateFile)
@@ -224,7 +225,7 @@ class TemplateFolder{
             folder = new File(Paths.get(currentPath.parent.toString(), nameWithInsertation.toString()).toString())
         }
 
-        folder.mkdirs()
+        folder.mkdir()
     }
 
     List save() {
@@ -261,21 +262,24 @@ class TemplateFolder{
             def templateFilesData = templateFolderData.templateFiles
 
 
+            for(templateFoldersGroup : templateFoldersData) {
+                for (templateFolder : templateFoldersGroup) {
+                    if(templateFolder != null){
+                        TemplateFolder newTemplateFolder = new TemplateFolder(Paths.get("."), "default")
+                        newTemplateFolder.load(templateFolder)
 
-            for (templateFolder : templateFoldersData) {
-                if(templateFolder != null){
-                    TemplateFolder newTemplateFolder = new TemplateFolder(Paths.get("."), "default")
-                    newTemplateFolder.load(templateFolder)
-
-                    this.templateFolders.add(newTemplateFolder)
+                        this.templateFolders.add(newTemplateFolder)
+                    }
                 }
             }
 
-            for (templateFile : templateFilesData) {
-                TemplateFile newTemplateFile = new TemplateFile(Paths.get("."), "default")
-                newTemplateFile.load(templateFile)
+            for(templateFilesGroup : templateFilesData) {
+                for (templateFile : templateFilesGroup) {
+                    TemplateFile newTemplateFile = new TemplateFile(Paths.get("."), "default")
+                    newTemplateFile.load(templateFile)
 
-                this.templateFiles.add(newTemplateFile)
+                    this.templateFiles.add(newTemplateFile)
+                }
             }
 
             def nameWithInsertationData = templateFolderData.nameWithInsertation
