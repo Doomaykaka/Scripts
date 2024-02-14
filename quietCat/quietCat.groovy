@@ -77,6 +77,7 @@ class Template {
                                         "definition": entry.key.getDifinition(),
                                         "type": entry.key.getType(),
                                         "description": entry.key.getDescription(),
+                                        "defaultValue": entry.key.getDefault(),
                                     ] ,
                                     entry.value
                                 )
@@ -104,8 +105,6 @@ class Template {
 
         def json = new JsonBuilder(templateData).toPrettyString()
 
-        println("<<<<<<<<<<<<" + json + ">>>>>>>>>>>>")
-
         File saveFile = new File(pathToTemplateFile.toString())
 
         FileWriter fw = new FileWriter(saveFile)
@@ -114,7 +113,57 @@ class Template {
     }
 
     def load(Path pathToTemplateFile){
+        def jsonSlurper = new JsonSlurper()
 
+        def json = ""
+
+        FileReader fr = new FileReader()
+        fr.read(json)
+        fr.close()
+
+        def dataSet = jsonSlurper.parseText(json)
+
+        def name = dataSet.name
+        def description = dataSet.description
+        this.name = name
+        this.description = description
+
+        def insertionsData = dataset.insertions
+
+        Insertations newInsertations = new Insertations()
+
+        for (entry : insertionsData) {
+            def key = entry.key
+            def value = entry.value
+
+            String definition = key.definition
+            String type = key.type
+            String insertationDescription = key.description
+            String defaultValue = key.defaultValue
+
+            Insertation newInsertation = new Insertation(definition, type, insertationDescription, defaultValue)
+
+            newInsertations.put(newInsertation, value)
+        }
+
+        this.insertions = newInsertations
+
+        def templateFoldersData = dataSet.templateFolders
+        def templateFilesData = dataSet.templateFiles
+
+        for (templateFolder : templateFoldersData) {
+            TemplateFolder newTemplateFolder = new TemplateFolder()
+            newTemplateFolder.load(templateFolderData)
+
+            this.templateFolders.add(newTemplateFolder)
+        }
+
+        for (templateFile : templateFilesData) {
+            TemplateFile newTemplateFile = new TemplateFile()
+            templateFile.load(templateFileData)
+
+            this.templateFiles.add(newTemplateFile)
+        }
     }
 
 }
@@ -184,8 +233,29 @@ class TemplateFolder{
         return saveStruct
     }
 
-    def load(){
-        return
+    def load(def templateFolderData) {
+        def templateFoldersData = templateFolderData.templateFolders
+        def templateFilesData = templateFolderData.templateFiles
+
+        for (templateFolder : templateFoldersData) {
+            TemplateFolder newTemplateFolder = new TemplateFolder()
+            newTemplateFolder.load(templateFolderData)
+
+            this.templateFolders.add(newTemplateFolder)
+        }
+
+        for (templateFile : templateFilesData) {
+            TemplateFile newTemplateFile = new TemplateFile()
+            templateFile.load(templateFileData)
+
+            this.templateFiles.add(newTemplateFile)
+        }
+
+        def nameWithInsertationData = templateFolderData.nameWithInsertation
+        def currentPathData = templateFolderData.currentPath
+
+        this.nameWithInsertation = nameWithInsertationData
+        this.currentPath = Paths.get(currentPathData)
     }
 
 }
@@ -203,7 +273,6 @@ class TemplateFile {
     }
 
     void parse(Insertations insertions) {
-        println(currentPath)
         File currentFile = new File(currentPath.toString())
 
         Scanner scn = new Scanner(currentFile)
@@ -247,8 +316,19 @@ class TemplateFile {
         return saveStruct
     }
 
-    def load() {
-        return
+    def load(def templateFileData) {
+
+        def contentData = templateFileData.content
+
+        for (raw : contentData) {
+            content.add(raw)
+        }
+
+        def nameWithInsertationData = templateFileData.nameWithInsertation
+        def currentPathData = templateFileData.currentPath
+
+        this.nameWithInsertation = nameWithInsertationData
+        this.currentPath = Paths.get(currentPathData)
     }
 
 }
@@ -282,7 +362,11 @@ class Insertations {
         String result = text
 
         for (Insertation insertation:insertationsMap.keys) {
-            result.replace(insertation.type , insertationsMap.get(insertation))
+            if (insertationsMap.get(insertation) == null) {
+                result.replace(insertation.type , insertation.defaultValue)
+            } else {
+                result.replace(insertation.type , insertationsMap.get(insertation))
+            }
         }
 
         return result
@@ -305,11 +389,13 @@ class Insertation {
     String definition
     String type
     String description
+    String defaultValue
 
-    Insertation(String definition, String type, String description){
+    Insertation(String definition, String type, String description, String defaultValue){
         this.definition = definition
         this.type = type
         this.description = description
+        this.defaultValue = defaultValue
     }
 
 }
@@ -360,11 +446,21 @@ def createCLI(){
     cliAnswer = createCLIQuestion(
                     questionText = "You need create or load template? (0 - create, 1 - load)",
                     isAppQuestion = true,
-                ) as Integer
+                )
+
+    if (cliAnswer.toString().isInteger()) {
+        cliAnswer = cliAnswer.toString() as Integer
+    } else {
+        cliAnswer = -1
+
+        printAppOutput(text="Bad answer", is_title=false, level=0, prefix="!", postfix="", needNewLine=true)
+        createCLI()
+        return
+    }
 
     templatesPath = downloadTemplates()
 
-    switch(cliAnswer){
+    switch (cliAnswer) {
         case 0:
             createTemplateCLI(templatesPath)
             break
@@ -372,8 +468,9 @@ def createCLI(){
             loadTemplateCLI(templatesPath)
             break
         default:
-            createCLI()
             printAppOutput(text="Bad answer", is_title=false, level=0, prefix="!", postfix="", needNewLine=true)
+            createCLI()
+            return
             break
     }
 
@@ -425,14 +522,109 @@ def createTemplateCLI(Path pathToTemplatesFolder){
     newTemplate.parse()
 
     newTemplate.save(Paths.get(pathToTemplatesFolder.toString(), templateName + ".json"))
-    uploadTemplates()
+    uploadTemplates(pathToTemplatesFolder.toString())
 }
 
-def loadTemplateCLI(Path pathToTemplatesFolder){
-    // templateNumber = createCLIQuestion(
-    //                                     questionText = "Input template name (example: SimpleApplication)",
-    //                                     isAppQuestion = false
-    //                                 )
+def uploadTemplates(String pathToTemplatesFolder) {
+    println("-----------")
+    println(pathToTemplatesFolder)
+    println("-----------")
+    println([
+        [
+            "cd",
+            pathToTemplatesFolder,
+        ].join(" "),
+        [
+            "git",
+            "add",
+            ".",
+        ].join(" "),
+        [
+            "git",
+            "commit",
+            "-m",
+            "\"Update\"",
+        ].join(" "),
+        [
+            "git",
+            "push",
+        ].join(" "),
+    ].join(" ")
+    )
+
+    //Path to templates folder absolute needed
+
+    executeCommands(
+        [
+            "cd",
+            pathToTemplatesFolder,
+        ].join(" "),
+        [
+            "git",
+            "add",
+            ".",
+        ].join(" "),
+        [
+            "git",
+            "commit",
+            "-m",
+            "\"Update\"",
+        ].join(" "),
+        [
+            "git",
+            "push",
+        ].join(" "),
+    )
+}
+
+def loadTemplateCLI(Path pathToTemplatesFolder) {
+    templatesList = loadTemplatesList(pathToTemplatesFolder)
+
+    chosenTemplateId = chooseTemplateCLI(templatesList)
+
+    fullTemplateName = templatesList.get(chosenTemplateId)
+
+    Template loadedTemplate = new Template(name = templateName, description = "default")
+    loadedTemplate.load(Paths.get(pathToTemplatesFolder.toString(), fullTemplateName))
+
+    loadedTemplate.generate()
+}
+
+Integer chooseTemplateCLI(Map templatesList){
+    printAppOutput(text = "Choose template (example: 1...)", is_title=false, level=2, prefix="[", postfix="]?: ", needNewLine=true)
+
+    for(key : templatesList.keys){
+        printAppOutput(text = """(${key}) - (${templatesList.get(key)})""", is_title=false, level=3, prefix="", postfix="", needNewLine=true)
+    }
+
+    templateId = createCLIQuestion(questionText = "Choose", isAppQuestion = true) as Integer
+
+    print(templateId)
+
+    if(!templatesList.containsKey(templateId)){
+        printAppOutput(text="Bad answer", is_title=false, level=0, prefix="!", postfix="", needNewLine=true)
+        chooseTemplateCLI(templatesList)
+    }
+
+    return templateId
+}
+
+def loadTemplatesList(Path pathToTemplatesFolder) {
+    templatesList = [:]
+
+    File currentFolder = new File(pathToTemplatesFolder.toString())
+
+    id = 0
+
+    for(File folderElement : currentFolder.listFiles()){
+        if((folderElement.isFile()) && (folderElement.getName().contains('.json'))){
+            templatesList.put(id, folderElement.getName())
+
+            id++
+        }
+    }
+
+    return templatesList
 }
 
 def clearTemplatesFolder(){
@@ -449,7 +641,7 @@ def String createCLIQuestion(String questionText, Boolean isAppQuestion){
     if(isAppQuestion){
         printAppOutput(text=questionText, is_title=false, level=1, prefix="", postfix=": ", needNewLine=false)
     } else {
-        printAppOutput(text=questionText, is_title=false, level=2, prefix="?[", postfix="]: ", needNewLine=false)
+        printAppOutput(text=questionText, is_title=false, level=2, prefix="[", postfix="]?: ", needNewLine=false)
     }
 
     return System.in.newReader().readLine()
