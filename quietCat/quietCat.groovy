@@ -197,14 +197,6 @@ class TemplateFolder{
         templateFiles = []
         this.nameWithInsertation = nameWithInsertation
         currentPath = Paths.get(parentDir.toString(), nameWithInsertation)
-
-        // #2
-        // println("===============")
-        // println(parentDir)
-        // println(parentDir.toString())
-        // println(nameWithInsertation)
-        // println(Paths.get(parentDir.toString(), nameWithInsertation).toString())
-        // println("===============")
     }
 
     void parse(){
@@ -235,18 +227,17 @@ class TemplateFolder{
             pathToFile = Paths.get(currentPath.parent.toString(), nameWithInsertation.toString())
         }
 
-        // #1
-        // println("===============")
-        // println(currentPath)
-        // println(currentPath.parent)
-        // println(currentPath.parent.ToString())
-        // println(nameWithInsertation)
-        // println(nameWithInsertation.toString())
-        // println("===============")
-
         folder = new File(pathToFile.toString())
 
         folder.mkdirs()
+
+        for (TemplateFolder childFolder : templateFolders) {
+            childFolder.generate(insertations)
+        }
+
+        for (TemplateFile childFile : templateFiles) {
+            childFile.generate(insertations)
+        }
     }
 
     List save() {
@@ -278,13 +269,6 @@ class TemplateFolder{
     }
 
     def load(def templateFolderData) {
-        // #3 возможно тут проблема
-        println("===============")
-        println(templateFolderData.templateFolder) //сама папка, содержит current path
-        println(templateFolderData.templateFolder.templateFolders) //папки этой папки)
-        println(templateFolderData.templateFolder.templateFiles) //файлы этой папки)
-        println("===============")
-
         if (templateFolderData != null) {
             def templateFoldersData = templateFolderData.templateFolder.templateFolders
             def templateFilesData = templateFolderData.templateFolder.templateFiles
@@ -304,7 +288,7 @@ class TemplateFolder{
             for(templateFilesGroup : templateFilesData) {
                 for (templateFile : templateFilesGroup) {
                     TemplateFile newTemplateFile = new TemplateFile(Paths.get("."), "default")
-                    newTemplateFile.load(templateFile)
+                    newTemplateFile.load(templateFile.templateFile)
 
                     this.templateFiles.add(newTemplateFile)
                 }
@@ -316,11 +300,6 @@ class TemplateFolder{
 
             this.nameWithInsertation = nameWithInsertationData
             this.currentPath = Paths.get(currentPathData.toString())
-
-            println("===============")
-            println(currentPathData.toString())
-            println(nameWithInsertationData)
-            println("===============")
         }
     }
 
@@ -341,7 +320,7 @@ class TemplateFile {
     void parse(Insertations insertions) {
         File currentFile = new File(currentPath.toString())
 
-        if (currentFile.exist()) {
+        if (currentFile.exists()) {
             Scanner scn = new Scanner(currentFile)
             while (scn.hasNextLine()) {
                 content.add(scn.nextLine())
