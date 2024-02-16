@@ -547,11 +547,19 @@ def createCLI(){
     switch (cliAnswer) {
         case 1:
             templatesPath = downloadTemplates()
-            createTemplateCLI(templatesPath)
+            if(templatesPath != null) {
+                createTemplateCLI(templatesPath)
+            } else {
+                createCLI()
+            }
             break
         case 2:
             templatesPath = downloadTemplates()
-            loadTemplateCLI(templatesPath)
+            if(templatesPath != null) {
+                loadTemplateCLI(templatesPath)
+            } else {
+                createCLI()
+            }
             break
         case 3:
             helpTemplateCLI()
@@ -586,11 +594,16 @@ def Path downloadTemplates(){
         ].join(" "),
     )
 
-    repoFolderNameMatches = (gitRepo =~ /\/(.+)\.git/)
-    repoFolderNameFirstMatch = repoFolderNameMatches[0]
-    repoFolderNameFirstFullMatch = repoFolderNameFirstMatch[1]
+    Path pathToTemplates = null;
 
-    Path pathToTemplates = Paths.get(".", "Templates", repoFolderNameFirstFullMatch)
+    repoFolderNameMatches = (gitRepo =~ /\/(.+)\.git/)
+
+    if(repoFolderNameMatches.size() != 0){
+        repoFolderNameFirstMatch = repoFolderNameMatches[0]
+        repoFolderNameFirstFullMatch = repoFolderNameFirstMatch[1]
+
+        pathToTemplates = Paths.get(".", "Templates", repoFolderNameFirstFullMatch)
+    }
 
     return pathToTemplates
 }
@@ -697,16 +710,13 @@ Integer chooseTemplateCLI(Map templatesList){
         templateId = templateId.toString() as Integer
     } else {
         templateId = -1
-
         printAppOutput(text="Bad answer", is_title=false, level=0, prefix="!", postfix="", needNewLine=true)
-        chooseTemplateCLI(templatesList)
-        return
+        return chooseTemplateCLI(templatesList)
     }
 
     if(!templatesList.containsKey(templateId)){
         printAppOutput(text="Bad answer", is_title=false, level=0, prefix="!", postfix="", needNewLine=true)
-        chooseTemplateCLI(templatesList)
-        return
+        return chooseTemplateCLI(templatesList)
     }
 
     return templateId
