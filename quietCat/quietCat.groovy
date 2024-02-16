@@ -432,10 +432,8 @@ class Insertations {
 
         for (Insertation insertation:insertationsMap.keySet()) {
             if (insertationsMap.get(insertation) == "") {
-                println(insertation.defaultValue)
                 result = result.replace(insertation.definition , insertation.defaultValue)
             } else {
-                println(insertationsMap.get(insertation))
                 result = result.replace(insertation.definition, insertationsMap.get(insertation))
             }
         }
