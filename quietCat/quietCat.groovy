@@ -43,13 +43,15 @@ class Template {
 
         for (File folderElement : currentFolder.listFiles()) {
             if (!Constants.EXCLUSION_FILENAMES.contains(folderElement.getName())) {
+                insertations.parse(folderElement.getName())
+
                 if (folderElement.isDirectory()) {
                     TemplateFolder folder = new TemplateFolder(currentPath, folderElement.getName())
-                    folder.parse()
+                    folder.parse(insertations)
                     templateFolders.add(folder)
                 } else {
                     TemplateFile file = new TemplateFile(currentPath, folderElement.getName())
-                    file.parse()
+                    file.parse(insertations)
                     templateFiles.add(file)
                 }
             }
@@ -76,10 +78,10 @@ class Template {
                                     [
                                         "insertation":
                                             [
-                                                "definition": entry.key.getDifinition(),
+                                                "definition": entry.key.getDefinition(),
                                                 "type": entry.key.getType(),
                                                 "description": entry.key.getDescription(),
-                                                "defaultValue": entry.key.getDefault(),
+                                                "defaultValue": entry.key.getDefaultValue(),
                                             ]
                                     ]
                                     ,
@@ -103,7 +105,7 @@ class Template {
         }
 
         def templateData = [
-                                "insertions": insertationsData,
+                                "insertations": insertationsData,
                                 "templateFolders": templateFoldersData,
                                 "templateFiles": templateFilesData,
                                 "name": this.name,
@@ -140,22 +142,19 @@ class Template {
         this.name = name
         this.description = description
 
-        def insertionsData = dataSet.insertions
+        def insertionsData = dataSet.insertations
 
         Insertations newInsertations = new Insertations()
 
         for (entry : insertionsData) {
             def key = entry.key
-            def value = entry.value
+            def value = entry.value.value
 
-            String definition = key.definition
-            String type = key.type
-            String insertationDescription = key.description
-            String defaultValue = key.defaultValue
+            String definition = (key =~ /\{insertation=\{definition=(.+), type=/)[0][1]
 
-            Insertation newInsertation = new Insertation(definition, type, insertationDescription, defaultValue)
+            Insertation newInsertation = new Insertation(definition)
 
-            newInsertations.put(newInsertation, value)
+            newInsertations.getInsertationsMap().put(newInsertation, value)
         }
 
         this.insertations = newInsertations
@@ -199,18 +198,20 @@ class TemplateFolder{
         currentPath = Paths.get(parentDir.toString(), nameWithInsertation)
     }
 
-    void parse(){
+    void parse(Insertations insertations){
         File currentFolder = new File(currentPath.toString())
 
         for(File folderElement : currentFolder.listFiles()){
             if(!Constants.EXCLUSION_FILENAMES.contains(folderElement.getName())){
+                insertations.parse(folderElement.getName())
+
                 if(folderElement.isDirectory()){
                     TemplateFolder folder = new TemplateFolder(currentPath, folderElement.getName())
-                    folder.parse()
+                    folder.parse(insertations)
                     templateFolders.add(folder)
                 } else {
                     TemplateFile file = new TemplateFile(currentPath, folderElement.getName())
-                    file.parse()
+                    file.parse(insertations)
                     templateFiles.add(file)
                 }
             }
@@ -221,7 +222,7 @@ class TemplateFolder{
         File folder
         Path pathToFile
 
-        if(insertations.size() != 0){
+        if(insertations.elementsCount() != 0){
             pathToFile = Paths.get(currentPath.parent.toString(), insertations.replace(nameWithInsertation.toString()))
         } else {
             pathToFile = Paths.get(currentPath.parent.toString(), nameWithInsertation.toString())
@@ -317,13 +318,16 @@ class TemplateFile {
         currentPath = Paths.get(parentDir.toString(), nameWithInsertation)
     }
 
-    void parse(Insertations insertions) {
+    void parse(Insertations insertations) {
         File currentFile = new File(currentPath.toString())
 
         if (currentFile.exists()) {
             Scanner scn = new Scanner(currentFile)
             while (scn.hasNextLine()) {
-                content.add(scn.nextLine())
+                def chunk = scn.nextLine()
+
+                insertations.parse(chunk)
+                content.add(chunk)
             }
             scn.close()
         }
@@ -332,25 +336,26 @@ class TemplateFile {
     void generate(Insertations insertations) {
         File file
 
-        if(insertations.size() != 0){
-            file = new File(Paths.get(currentPath.parent.toString(), insertations.replace(nameWithInsertation)).toString())
+        if(insertations.elementsCount() != 0){
+            file = new File(Paths.get(insertations.replace(currentPath.parent.toString()), insertations.replace(nameWithInsertation)).toString())
         } else {
             file = new File(Paths.get(currentPath.parent.toString(), nameWithInsertation).toString())
         }
 
-        if (file.createNewFile()) {
-            FileWriter fw = new FileWriter(file)
+        file.createNewFile()
 
-            for(String raw : content){
-                if(insertations.size() != 0){
-                    fw.write(insertations.replace(raw) + "\n")
-                } else {
-                    fw.write(raw + "\n")
-                }
+        FileWriter fw = new FileWriter(file)
+
+        for(String raw : content){
+            if(insertations.elementsCount() != 0){
+                fw.write(insertations.replace(raw) + "\n")
+            } else {
+                fw.write(raw + "\n")
             }
-
-            fw.close()
         }
+
+        fw.close()
+
     }
 
     List save() {
@@ -403,27 +408,35 @@ class Insertations {
         if (insertationsMap.containsKey(insertation)) {
             if (validateInsertationValue(insertation, value)) {
                 insertationsMap.put(insertation, value)
+
+                return true
             }
         }
+
+        return false
     }
 
     void parse(String text){
-        matches = (text =~ /\[\\*\/\]/)
+        def matches = text =~ /\[\-.*\-\]/
 
-        for (match : matches) {
-            Insertation insertation = new Insertation(match, match[2..-2])
-            put(insertation, null)
+        while(matches.find()){
+            def match = matches.group()
+
+            Insertation insertation = new Insertation(match)
+            insertationsMap.put(insertation, "")
         }
     }
 
     String replace(String text){
         String result = text
 
-        for (Insertation insertation:insertationsMap.keys) {
-            if (insertationsMap.get(insertation) == null) {
-                result.replace(insertation.type , insertation.defaultValue)
+        for (Insertation insertation:insertationsMap.keySet()) {
+            if (insertationsMap.get(insertation) == "") {
+                println(insertation.defaultValue)
+                result = result.replace(insertation.definition , insertation.defaultValue)
             } else {
-                result.replace(insertation.type , insertationsMap.get(insertation))
+                println(insertationsMap.get(insertation))
+                result = result.replace(insertation.definition, insertationsMap.get(insertation))
             }
         }
 
@@ -434,16 +447,15 @@ class Insertations {
         insertationsMap.clear()
     }
 
+    Integer elementsCount() {
+        return insertationsMap.size()
+    }
+
     private Boolean validateInsertationValue(Insertation insertation, String value) {
         String typeRegexp = insertation.type
 
         return value.matches(typeRegexp)
     }
-
-    int size() {
-        return insertationsMap.size()
-    }
-
 }
 
 class Insertation {
@@ -453,13 +465,25 @@ class Insertation {
     String description
     String defaultValue
 
-    Insertation(String definition, String type, String description, String defaultValue){
+    Insertation(String definition){
         this.definition = definition
-        this.type = type
-        this.description = description
-        this.defaultValue = defaultValue
+        this.type = "*"
+        this.description = "default"
+        this.defaultValue = null
+
+        parseInsertation()
     }
 
+    def parseInsertation() {
+        def insertationParts = definition[2..-3].split(";")
+        this.type = (insertationParts[0]).replaceFirst("type=", "")
+        this.description = (insertationParts[1]).replaceFirst("description=", "")
+        this.defaultValue = (insertationParts[2]).replaceFirst("default=", "")
+
+        if(this.type == "ALL"){
+            this.type = ".*"
+        }
+    }
 }
 
 def app() {
@@ -620,6 +644,8 @@ def loadTemplateCLI(Path pathToTemplatesFolder) {
     Template loadedTemplate = new Template(name = fullTemplateName, description = "default")
     loadedTemplate.load(Paths.get(pathToTemplatesFolder.toString(), fullTemplateName))
 
+    insertValues(loadedTemplate)
+
     loadedTemplate.generate()
 }
 
@@ -669,7 +695,24 @@ def loadTemplatesList(Path pathToTemplatesFolder) {
     return templatesList
 }
 
-def clearTemplatesFolder(){
+def insertValues(Template loadedTemplate) {
+    def insertations = loadedTemplate.getInsertations()
+    def insertationsMap = loadedTemplate.getInsertations().getInsertationsMap()
+
+    printAppOutput(text = "Input values", is_title=false, level=2, prefix="[", postfix="]?: ", needNewLine=true)
+
+    for(Insertation insertation : insertationsMap.keySet()){
+        def answerIsRight = false
+
+        while(!answerIsRight){
+            def answer = createCLIQuestion(insertation.getDescription(), false)
+
+            answerIsRight = insertations.put(insertation, answer)
+        }
+    }
+}
+
+def clearTemplatesFolder() {
     executeCommand(
         [
             "rm",
@@ -679,7 +722,7 @@ def clearTemplatesFolder(){
     )
 }
 
-def String createCLIQuestion(String questionText, Boolean isAppQuestion){
+def String createCLIQuestion(String questionText, Boolean isAppQuestion) {
     if(isAppQuestion){
         printAppOutput(text=questionText, is_title=false, level=1, prefix="", postfix=": ", needNewLine=false)
     } else {
@@ -689,7 +732,7 @@ def String createCLIQuestion(String questionText, Boolean isAppQuestion){
     return System.in.newReader().readLine()
 }
 
-def executeCommands(String[] commands){
+def executeCommands(String[] commands) {
     unionCommand = ""
 
     unionCommand = commands.join(";")
@@ -697,7 +740,7 @@ def executeCommands(String[] commands){
     executeCommand(unionCommand)
 }
 
-def executeCommand(String command){
+def executeCommand(String command) {
     Path currentDir = Paths.get((new File(".")).getAbsolutePath())
 
     def commandWrapper = [
