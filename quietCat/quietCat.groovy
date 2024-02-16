@@ -528,7 +528,7 @@ def printAppOutput(String text, Boolean is_title, Integer level, String prefix, 
 
 def createCLI(){
     cliAnswer = createCLIQuestion(
-                    questionText = "You need create or load template? (0 - create, 1 - load)",
+                    questionText = "You need create template, load template or view help? (1 - create, 2 - load, 3 - help)",
                     isAppQuestion = true,
                 )
 
@@ -542,15 +542,20 @@ def createCLI(){
         return
     }
 
-    templatesPath = downloadTemplates()
+
 
     switch (cliAnswer) {
-        case 0:
+        case 1:
+            templatesPath = downloadTemplates()
             createTemplateCLI(templatesPath)
             break
-        case 1:
+        case 2:
+            templatesPath = downloadTemplates()
             loadTemplateCLI(templatesPath)
             break
+        case 3:
+            helpTemplateCLI()
+            return
         default:
             printAppOutput(text="Bad answer", is_title=false, level=0, prefix="!", postfix="", needNewLine=true)
             createCLI()
@@ -591,6 +596,7 @@ def Path downloadTemplates(){
 }
 
 def createTemplateCLI(Path pathToTemplatesFolder){
+    printAppOutput(text="Create", is_title=true, level=0, prefix="", postfix="", needNewLine=true)
     templateName = createCLIQuestion(
                                         questionText = "Input template name (example: SimpleApplication)",
                                         isAppQuestion = false
@@ -633,6 +639,7 @@ def uploadTemplates(String pathToTemplatesFolder) {
 }
 
 def loadTemplateCLI(Path pathToTemplatesFolder) {
+    printAppOutput(text="Load", is_title=true, level=0, prefix="", postfix="", needNewLine=true)
     templatesList = loadTemplatesList(pathToTemplatesFolder)
 
     chosenTemplateId = chooseTemplateCLI(templatesList)
@@ -645,6 +652,36 @@ def loadTemplateCLI(Path pathToTemplatesFolder) {
     insertValues(loadedTemplate)
 
     loadedTemplate.generate()
+}
+
+def helpTemplateCLI() {
+    printAppOutput(text="Help", is_title=true, level=0, prefix="", postfix="", needNewLine=true)
+    printAppOutput(
+                        text="To insert a template string," +
+                        "instead of changing text," +
+                        "you need to insert an expression like" +
+                        "[-type=regex;description=description;default=default value-]",
+                        is_title=false,
+                        level=1,
+                        prefix="",
+                        postfix="",
+                        needNewLine=true
+                  )
+    printAppOutput(
+                        text="To insert a type into a folder name you must use the alias ALL",
+                        is_title=false,
+                        level=1, prefix="",
+                        postfix="",
+                        needNewLine=true
+                  )
+    printAppOutput(
+                        text="The link to the repository is specified in ssh format",
+                        is_title=false,
+                        level=1,
+                        prefix="",
+                        postfix="",
+                        needNewLine=true
+                  )
 }
 
 Integer chooseTemplateCLI(Map templatesList){
