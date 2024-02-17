@@ -2,6 +2,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 import java.util.zip.ZipOutputStream
 import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import groovy.cli.commons.CliBuilder
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -12,10 +13,27 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import groovy.json.*
 
+enum ExecuterType {
+    Bash,
+    Powershell
+
+    String getValue(){
+        if(this == ExecuterType.Bash) {
+            return "bash"
+        }
+
+        return "powershell"
+    }
+}
+
 class Constants {
 
-    def static final EXCLUSION_FILENAMES = ['quietCat.groovy', 'Templates']
+    def static final EXCLUSION_FILENAMES = [
+        'quietCat.groovy',
+        'Templates'
+    ]
 
+    def static final EXECUTER_TYPE = ExecuterType.Bash
 }
 
 class Template {
@@ -34,7 +52,6 @@ class Template {
         this.templateFiles = []
         this.name = name
         this.description = description
-
     }
 
     def parse() {
@@ -56,7 +73,6 @@ class Template {
                 }
             }
         }
-
     }
 
     def generate(){
@@ -75,21 +91,21 @@ class Template {
 
         for (entry in (this.insertations).getInsertationsMap()) {
             insertationsData.put(
-                                    [
-                                        "insertation":
-                                            [
-                                                "definition": entry.key.getDefinition(),
-                                                "type": entry.key.getType(),
-                                                "description": entry.key.getDescription(),
-                                                "defaultValue": entry.key.getDefaultValue(),
-                                            ]
-                                    ]
-                                    ,
-                                    [
-                                        "value":entry.value
-                                    ]
+                    [
+                        "insertation":
+                        [
+                            "definition": entry.key.getDefinition(),
+                            "type": entry.key.getType(),
+                            "description": entry.key.getDescription(),
+                            "defaultValue": entry.key.getDefaultValue(),
+                        ]
+                    ]
+                    ,
+                    [
+                        "value":entry.value
+                    ]
 
-                                )
+                    )
         }
 
         def templateFoldersData = []
@@ -105,12 +121,12 @@ class Template {
         }
 
         def templateData = [
-                                "insertations": insertationsData,
-                                "templateFolders": templateFoldersData,
-                                "templateFiles": templateFilesData,
-                                "name": this.name,
-                                "description": this.description,
-                            ]
+            "insertations": insertationsData,
+            "templateFolders": templateFoldersData,
+            "templateFiles": templateFilesData,
+            "name": this.name,
+            "description": this.description,
+        ]
 
         def json = new JsonBuilder(templateData).toPrettyString()
 
@@ -181,7 +197,6 @@ class Template {
             }
         }
     }
-
 }
 
 class TemplateFolder{
@@ -257,13 +272,13 @@ class TemplateFolder{
         }
 
         saveStruct.add(
-            "templateFolder":
-            [
-                'templateFolders' : templateFoldersStruct,
-                'templateFiles' : templateFilesStruct,
-                'nameWithInsertation' : nameWithInsertation,
-                'currentPath' : currentPath.toString(),
-            ]
+        "templateFolder":
+        [
+            'templateFolders' : templateFoldersStruct,
+            'templateFiles' : templateFilesStruct,
+            'nameWithInsertation' : nameWithInsertation,
+            'currentPath' : currentPath.toString(),
+        ]
         )
 
         return saveStruct
@@ -303,7 +318,6 @@ class TemplateFolder{
             this.currentPath = Paths.get(currentPathData.toString())
         }
     }
-
 }
 
 class TemplateFile {
@@ -355,7 +369,6 @@ class TemplateFile {
         }
 
         fw.close()
-
     }
 
     List save() {
@@ -368,11 +381,11 @@ class TemplateFile {
         }
 
         saveStruct.add("templateFile":
-                        [
-                            'content' : contentStruct,
-                            'nameWithInsertation' : nameWithInsertation,
-                            'currentPath' : currentPath.toString(),
-                        ]
+        [
+            'content' : contentStruct,
+            'nameWithInsertation' : nameWithInsertation,
+            'currentPath' : currentPath.toString(),
+        ]
         )
 
         return saveStruct
@@ -393,7 +406,6 @@ class TemplateFile {
             this.currentPath = Paths.get(currentPathData.toString())
         }
     }
-
 }
 
 class Insertations {
@@ -528,9 +540,9 @@ def printAppOutput(String text, Boolean is_title, Integer level, String prefix, 
 
 def createCLI(){
     cliAnswer = createCLIQuestion(
-                    questionText = "You need create template, load template or view help? (1 - create, 2 - load, 3 - help)",
-                    isAppQuestion = true,
-                )
+    questionText = "You need create template, load template or view help? (1 - create, 2 - load, 3 - help)",
+    isAppQuestion = true,
+    )
 
     if (cliAnswer.toString().isInteger()) {
         cliAnswer = cliAnswer.toString() as Integer
@@ -576,33 +588,64 @@ def createCLI(){
 }
 
 def Path downloadTemplates(){
-    gitRepo = createCLIQuestion(questionText = "Input git repo with templates link (url)", isAppQuestion = true)
-
-    executeCommands(
-        [
-            "mkdir",
-            "Templates",
-        ].join(" "),
-        [
-            "cd",
-            "Templates",
-        ].join(" "),
-        [
-            "git",
-            "clone",
-            gitRepo,
-        ].join(" "),
-    )
+    gitRepo = createCLIQuestion(questionText = "Input git repo with templates link or archive link (url)", isAppQuestion = true)
 
     Path pathToTemplates = null;
 
     repoFolderNameMatches = (gitRepo =~ /\/(.+)\.git/)
 
     if(repoFolderNameMatches.size() != 0){
+        executeCommands(
+            [
+                "mkdir",
+                "Templates",
+            ].join(" "),
+            [
+                "cd",
+                "Templates",
+            ].join(" "),
+            [
+                "git",
+                "clone",
+                gitRepo,
+            ].join(" "),
+        )
+
         repoFolderNameFirstMatch = repoFolderNameMatches[0]
         repoFolderNameFirstFullMatch = repoFolderNameFirstMatch[1]
 
         pathToTemplates = Paths.get(".", "Templates", repoFolderNameFirstFullMatch)
+    } else {
+        zipLinkNameMatches = (gitRepo =~ /\/(.+)\.zip/)
+
+        if(zipLinkNameMatches.size() != 0) {
+
+            File templatesDir = new File(Paths.get(".", "Templates").toString())
+            templatesDir.mkdir()
+
+            pathToTemplates = Paths.get(".", "Templates", "zip")
+            File templatesDirZip = new File(pathToTemplates.toString())
+
+            templatesDirZip.mkdir()
+
+            File archive = new File(Paths.get(".", "Templates", "zip", "templates.zip").toString())
+            archive.createNewFile()
+
+            URL urlToZip = new URL(gitRepo)
+
+            archive.bytes = urlToZip.bytes
+
+            def zipFile = new ZipFile(archive)
+
+            zipFile.entries().findAll{ !it.directory && it.name.endsWith(".json")}.each{
+                File templateFile = new File(Paths.get(".", "Templates", "zip", new File(it.name).getName()).toString())
+                templateFile.createNewFile()
+                FileWriter fw = new FileWriter(templateFile)
+                fw.write(zipFile.getInputStream(it).text)
+                fw.close()
+            }
+
+        }
     }
 
     return pathToTemplates
@@ -611,14 +654,14 @@ def Path downloadTemplates(){
 def createTemplateCLI(Path pathToTemplatesFolder){
     printAppOutput(text="Create", is_title=true, level=0, prefix="", postfix="", needNewLine=true)
     templateName = createCLIQuestion(
-                                        questionText = "Input template name (example: SimpleApplication)",
-                                        isAppQuestion = false
-                                    )
+    questionText = "Input template name (example: SimpleApplication)",
+    isAppQuestion = false
+    )
     templateDescription = createCLIQuestion(
-                                                questionText =
-                                                "Input template description (example: simple application)",
-                                                isAppQuestion = false
-                                            )
+    questionText =
+    "Input template description (example: simple application)",
+    isAppQuestion = false
+    )
 
     Template newTemplate = new Template(name = templateName, description = templateDescription)
     newTemplate.parse()
@@ -629,25 +672,25 @@ def createTemplateCLI(Path pathToTemplatesFolder){
 
 def uploadTemplates(String pathToTemplatesFolder) {
     executeCommands(
-        [
-            "cd",
-            """\"${pathToTemplatesFolder}\"""",
-        ].join(" "),
-        [
-            "git",
-            "add",
-            ".",
-        ].join(" "),
-        [
-            "git",
-            "commit",
-            "-m",
-            "\"Update\"",
-        ].join(" "),
-        [
-            "git",
-            "push",
-        ].join(" "),
+    [
+        "cd",
+        """\"${pathToTemplatesFolder}\"""",
+    ].join(" "),
+    [
+        "git",
+        "add",
+        ".",
+    ].join(" "),
+    [
+        "git",
+        "commit",
+        "-m",
+        "\"Update\"",
+    ].join(" "),
+    [
+        "git",
+        "push",
+    ].join(" "),
     )
 }
 
@@ -667,34 +710,35 @@ def loadTemplateCLI(Path pathToTemplatesFolder) {
     loadedTemplate.generate()
 }
 
-def helpTemplateCLI() {
-    printAppOutput(text="Help", is_title=true, level=0, prefix="", postfix="", needNewLine=true)
+void helpTemplateCLI() {
+    printAppOutput(text = "Help", is_title = true, level = 0, prefix = "", postfix = "", needNewLine = true)
     printAppOutput(
-                        text="To insert a template string," +
-                        "instead of changing text," +
-                        "you need to insert an expression like" +
-                        "[-type=regex;description=description;default=default value-]",
-                        is_title=false,
-                        level=1,
-                        prefix="",
-                        postfix="",
-                        needNewLine=true
-                  )
+        text = "To insert a template string," +
+        "instead of changing text," +
+        "you need to insert an expression like" +
+        "[-type=regex;description=description;default=default value-]",
+        is_title = false,
+        level = 1,
+        prefix = "",
+        postfix = "",
+        needNewLine = true
+    )
     printAppOutput(
-                        text="To insert a type into a folder name you must use the alias ALL",
-                        is_title=false,
-                        level=1, prefix="",
-                        postfix="",
-                        needNewLine=true
-                  )
+        text = "To insert a type into a folder name you must use the alias ALL",
+        is_title = false,
+        level = 1,
+        prefix = "",
+        postfix = "",
+        needNewLine = true
+    )
     printAppOutput(
-                        text="The link to the repository is specified in ssh format",
-                        is_title=false,
-                        level=1,
-                        prefix="",
-                        postfix="",
-                        needNewLine=true
-                  )
+        text = "The link to the repository is specified in ssh format",
+        is_title = false,
+        level = 1,
+        prefix = "",
+        postfix = "",
+        needNewLine = true
+    )
 }
 
 Integer chooseTemplateCLI(Map templatesList){
@@ -759,11 +803,12 @@ def insertValues(Template loadedTemplate) {
 
 def clearTemplatesFolder() {
     executeCommand(
-        [
-            "rm",
-            "-r",
-            "./Templates",
-        ].join(" ")
+    [
+        "rm",
+        "-r",
+        "./Templates",
+    ].join(" "),
+    Constants.EXECUTER_TYPE
     )
 }
 
@@ -782,10 +827,10 @@ def executeCommands(String[] commands) {
 
     unionCommand = commands.join(";")
 
-    executeCommand(unionCommand)
+    executeCommand(unionCommand, Constants.EXECUTER_TYPE)
 }
 
-def executeCommand(String command) {
+def executeCommand(String command, ExecuterType executerType) {
     Path currentDir = Paths.get((new File(".")).getAbsolutePath())
 
     def commandWrapper = [
@@ -796,7 +841,7 @@ def executeCommand(String command) {
     ].join(' ')
 
     def executer = [
-        'bash',
+        executerType.getValue(),
         '-c',
         '\'',
         commandWrapper.toString(),
@@ -805,11 +850,11 @@ def executeCommand(String command) {
 
     Process process = executer.execute()
 
-    new StringWriter().with {
-         o -> new StringWriter().with {
-            e -> process.waitForProcessOutput(o, e)
-            [ o, e ]*.toString()
-         }
+    (o,e) = new StringWriter().with { o ->
+        new StringWriter().with { e ->
+            process.waitForProcessOutput(o, e)
+            [o, e]*.toString()
+        }
     }
 }
 
