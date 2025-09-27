@@ -237,7 +237,7 @@ class TemplateFolder{
         File folder
         Path pathToFile
 
-        if(insertations.elementsCount() != 0){
+        if(insertations.elementsCount() != 0 && !Insertations.getDisabled()){
             pathToFile = Paths.get(currentPath.parent.toString(), insertations.replace(nameWithInsertation.toString()))
         } else {
             pathToFile = Paths.get(currentPath.parent.toString(), nameWithInsertation.toString())
@@ -350,7 +350,7 @@ class TemplateFile {
     void generate(Insertations insertations) {
         File file
 
-        if(insertations.elementsCount() != 0){
+        if(insertations.elementsCount() != 0 && !Insertations.getDisabled()){
             file = new File(Paths.get(insertations.replace(currentPath.parent.toString()), insertations.replace(nameWithInsertation)).toString())
         } else {
             file = new File(Paths.get(currentPath.parent.toString(), nameWithInsertation).toString())
@@ -361,7 +361,7 @@ class TemplateFile {
         FileWriter fw = new FileWriter(file)
 
         for(String raw : content){
-            if(insertations.elementsCount() != 0){
+            if(insertations.elementsCount() != 0 && !Insertations.getDisabled()){
                 fw.write(insertations.replace(raw) + "\n")
             } else {
                 fw.write(raw + "\n")
@@ -410,6 +410,8 @@ class TemplateFile {
 
 class Insertations {
 
+    static Boolean disabled = false
+
     Map<Insertation, String> insertationsMap
 
     Insertations() {
@@ -442,11 +444,13 @@ class Insertations {
     String replace(String text){
         String result = text
 
-        for (Insertation insertation:insertationsMap.keySet()) {
-            if (insertationsMap.get(insertation) == "") {
-                result = result.replace(insertation.definition , insertation.defaultValue)
-            } else {
-                result = result.replace(insertation.definition, insertationsMap.get(insertation))
+        if(!disabled){
+            for (Insertation insertation:insertationsMap.keySet()) {
+                if (insertationsMap.get(insertation) == "") {
+                    result = result.replace(insertation.definition , insertation.defaultValue)
+                } else {
+                    result = result.replace(insertation.definition, insertationsMap.get(insertation))
+                }
             }
         }
 
@@ -459,6 +463,14 @@ class Insertations {
 
     Integer elementsCount() {
         return insertationsMap.size()
+    }
+
+    static void setDisabled(Boolean value) {
+        disabled = value
+    }
+
+    static Boolean getDisabled() {
+        return disabled
     }
 
     private Boolean validateInsertationValue(Insertation insertation, String value) {
@@ -540,7 +552,7 @@ def printAppOutput(String text, Boolean is_title, Integer level, String prefix, 
 
 def createCLI(){
     cliAnswer = createCLIQuestion(
-    questionText = "You need create template, load template or view help? (1 - create, 2 - load, 3 - help)",
+    questionText = "You need create template, load template or view help? (1 - create, 2 - load, 3 - load template, 4 - help)",
     isAppQuestion = true,
     )
 
@@ -554,7 +566,7 @@ def createCLI(){
         return
     }
 
-
+    Insertations.setDisabled(false)
 
     switch (cliAnswer) {
         case 1:
@@ -574,6 +586,16 @@ def createCLI(){
             }
             break
         case 3:
+            Insertations.setDisabled(true)
+
+            templatesPath = downloadTemplates()
+            if(templatesPath != null) {
+                loadTemplateCLI(templatesPath)
+            } else {
+                createCLI()
+            }
+            break
+        case 4:
             helpTemplateCLI()
             return
         default:
@@ -787,6 +809,10 @@ def loadTemplatesList(Path pathToTemplatesFolder) {
 def insertValues(Template loadedTemplate) {
     def insertations = loadedTemplate.getInsertations()
     def insertationsMap = loadedTemplate.getInsertations().getInsertationsMap()
+
+    if(Insertations.getDisabled()) {
+        return
+    }
 
     printAppOutput(text = "Input values", is_title=false, level=2, prefix="[", postfix="]?: ", needNewLine=true)
 
