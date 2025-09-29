@@ -1,8 +1,10 @@
 cd "$(dirname "${BASH_SOURCE[0]}")"
+path=$(find ~+ -type f -name "*.diff" | head -1)
+echo "${path}"
 mkdir TMP
 cd TMP
 git init
-cp "$1" .
+cp "${path}" .
 cat *
 read
 cd ..
